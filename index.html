@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나의 성장과정 활동지 만들기</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- html2canvas & jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
+        body { font-family: 'Gowun Dodum', sans-serif; background-color: #fdfbf7; }
+        
+        /* 스크롤바 숨기기 (미리보기 창용) */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 파일 업로드 버튼 스타일 커스텀 */
+        input[type="file"]::file-selector-button {
+            border: none;
+            background: #fbbf24;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: #78350f;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background .2s ease-in-out;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        const App = () => {
+            const [bgImage, setBgImage] = useState(null);
+            const [photos, setPhotos] = useState(Array(5).fill(null));
+            const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+            const [isGenerating, setIsGenerating] = useState(false);
+
+            const stages = [
+                "1. 태어났을 때 (50일 전)",
+                "2. 돌 (만 1세)",
+                "3. 만 2~3세",
+                "4. 만 4~5세",
+                "5. 1학년 (만 6~7세)"
+            ];
+
+            // 테이프 스타일 설정: 1~5번째 테이프 모두 세로 방향으로 회전, 크기는 기존의 80% 수준으로 축소
+            const tapes = [
+                { color: 'bg-green-400', cssTransform: 'rotate(-93deg)', w: 'w-16', h: 'h-5', top: '-24px' },
+                { color: 'bg-pink-400', cssTransform: 'rotate(-90deg)', w: 'w-16', h: 'h-5', top: '-24px' },
+                { color: 'bg-amber-600', cssTransform: 'rotate(-90deg)', w: 'w-16', h: 'h-5', top: '-24px' },
+                { color: 'bg-gray-300', cssTransform: 'rotate(-90deg)', w: 'w-16', h: 'h-5', top: '-24px' },
+                { color: 'bg-blue-300', cssTransform: 'rotate(-90deg)', w: 'w-16', h: 'h-5', top: '-24px' },
+            ];
+
+            // A4 가로 (1123px * 794px) 기준 위치
+            // 2~5번째 카드는 가로 줄(top: 200px)에 걸리도록 일정한 높이(220px)로 설정
+            const positions = [
+                { left: '40px', top: '240px', transform: 'rotate(-3deg)' },
+                { left: '250px', top: '220px', transform: 'rotate(2deg)' },
+                { left: '470px', top: '220px', transform: 'rotate(-1deg)' },
+                { left: '690px', top: '220px', transform: 'rotate(4deg)' },
+                { left: '900px', top: '220px', transform: 'rotate(-2deg)' }
+            ];
+
+            const handleBgUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) setBgImage(URL.createObjectURL(file));
+            };
+
+            const handlePhotoUpload = (index, e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const newPhotos = [...photos];
+                    newPhotos[index] = URL.createObjectURL(file);
+                    setPhotos(newPhotos);
+                }
+            };
+
+            const generatePDF = async () => {
+                setIsGenerating(true);
+                const element = document.getElementById('pdf-content');
+                
+                try {
+                    const canvas = await html2canvas(element, {
+                        scale: 2, // 고화질 출력
+                        useCORS: true,
+                        backgroundColor: '#ffffff'
+                    });
+                    
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const pdf = new window.jspdf.jsPDF({
+                        orientation: 'landscape',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+                    
+                    // A4 가로 사이즈 (297mm x 210mm)
+                    pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+                    pdf.save('나의_성장과정_활동지.pdf');
+                } catch (error) {
+                    console.error("PDF 생성 중 오류 발생:", error);
+                    alert("PDF 생성 중 문제가 발생했습니다.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen p-6 md:p-12">
+                    <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border-2 border-amber-100">
+                        
+                        {/* 헤더 */}
+                        <div className="bg-amber-100 text-amber-900 py-6 text-center">
+                            <h1 className="text-3xl font-bold">[ 나의 성장과정 ]</h1>
+                        </div>
+
+                        <div className="p-8 space-y-8">
+                            
+                            {/* 배경 이미지 업로드 섹션 */}
+                            <div className="bg-orange-50 p-6 rounded-2xl border border-orange-200">
+                                <h2 className="text-xl font-bold mb-3 text-orange-800">📌 1단계: 배경 양식 업로드</h2>
+                                <p className="text-sm text-orange-600 mb-4">제공받으신 <b>'배경.JPG'</b> 파일을 여기에 업로드해주세요.</p>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleBgUpload}
+                                    className="block w-full text-sm text-gray-500"
+                                />
+                            </div>
+
+                            {/* 사진 업로드 섹션 */}
+                            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+                                <h2 className="text-xl font-bold mb-2 text-blue-800">📸 2단계: 성장 사진 업로드 (총 5장)</h2>
+                                <ul className="text-sm text-blue-600 mb-5 space-y-1">
+                                    <li>* 얼굴이 선명하게 나온 사진을 업로드해 주세요.</li>
+                                    <li>* 개인정보 보호를 위해 업로드한 이미지는 수집 및 저장되지 않습니다.</li>
+                                </ul>
+                                <div className="space-y-4">
+                                    {stages.map((stage, index) => (
+                                        <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-blue-100 gap-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
+                                                    {photos[index] ? (
+                                                        <img src={photos[index]} alt={stage} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs text-center">사진 없음</div>
+                                                    )}
+                                                </div>
+                                                <span className="font-bold text-gray-700">{stage}</span>
+                                            </div>
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={(e) => handlePhotoUpload(index, e)}
+                                                className="block text-sm text-gray-500"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 버튼 섹션 */}
+                            <div className="flex justify-center pt-4">
+                                <button 
+                                    onClick={() => setIsPreviewOpen(true)}
+                                    className="bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-4 px-12 rounded-full shadow-lg transition-transform transform hover:-translate-y-1"
+                                >
+                                    미리보기 / PDF 저장
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 미리보기 모달 팝업 */}
+                    {isPreviewOpen && (
+                        <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex flex-col">
+                            <div className="p-4 flex justify-between items-center bg-gray-900 text-white">
+                                <h3 className="text-xl font-bold">📄 활동지 미리보기</h3>
+                                <div className="space-x-4">
+                                    <button 
+                                        onClick={() => setIsPreviewOpen(false)}
+                                        className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold"
+                                    >
+                                        닫기
+                                    </button>
+                                    <button 
+                                        onClick={generatePDF}
+                                        disabled={isGenerating}
+                                        className={`px-6 py-2 rounded-lg font-bold text-white shadow-lg ${isGenerating ? 'bg-gray-500 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-400'}`}
+                                    >
+                                        {isGenerating ? 'PDF 생성 중...' : '⬇️ PDF 다운로드'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 캔버스 랩퍼: 스크롤 가능하게 처리 */}
+                            <div className="flex-1 overflow-auto hide-scroll flex items-center justify-center p-8">
+                                {/* 실제 A4 렌더링 영역 (고정 픽셀) */}
+                                <div 
+                                    id="pdf-content" 
+                                    className="relative bg-white shadow-2xl flex-shrink-0 origin-center"
+                                    style={{ width: '1123px', height: '794px' }}
+                                >
+                                    {/* 배경 이미지 */}
+                                    {bgImage ? (
+                                        <img src={bgImage} className="absolute inset-0 w-full h-full object-cover" alt="배경" />
+                                    ) : (
+                                        <div className="absolute inset-0 bg-white"></div>
+                                    )}
+
+                                    {/* 사진을 거는 가로 줄 */}
+                                    <div className="absolute left-0 w-full h-1 bg-slate-400 shadow-sm z-0" style={{ top: '200px' }}></div>
+
+                                    {/* 사진 및 마스킹 테이프 배치 */}
+                                    {photos.map((photo, i) => (
+                                        <div 
+                                            key={i} 
+                                            className="absolute bg-white flex flex-col items-center justify-center shadow-md rounded-sm"
+                                            style={{ 
+                                                left: positions[i].left, 
+                                                top: positions[i].top, 
+                                                transform: positions[i].transform,
+                                                width: '180px', // 가로 약 5cm
+                                                height: '240px' // 휴대폰 세로 비율 (3:4)
+                                            }}
+                                        >
+                                            {/* 마스킹 테이프 효과 */}
+                                            <div 
+                                                className={`absolute ${tapes[i].w} ${tapes[i].h} ${tapes[i].color} opacity-80 z-10 shadow-sm`}
+                                                style={{ 
+                                                    top: tapes[i].top,
+                                                    left: '50%', 
+                                                    transform: `translateX(-50%) ${tapes[i].cssTransform}`,
+                                                    mixBlendMode: 'multiply',
+                                                    borderLeft: '2px dashed rgba(0,0,0,0.1)',
+                                                    borderRight: '2px dashed rgba(0,0,0,0.1)'
+                                                }}
+                                            ></div>
+                                            
+                                            {/* 업로드된 사진 */}
+                                            <div className="w-full h-full overflow-hidden z-0">
+                                                {photo ? (
+                                                    <img src={photo} alt={`성장사진 ${i+1}`} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gray-200 flex flex-col items-center justify-center text-gray-400 border border-gray-300">
+                                                        <span className="text-3xl mb-2">📷</span>
+                                                        <span className="text-sm">사진 {i+1}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
