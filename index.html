@@ -47,13 +47,16 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useRef } = React;
+        const { useState } = React;
+
+        // GitHub의 이미지를 직접 불러오고 html2canvas의 CORS 문제를 방지하기 위해 raw.githubusercontent.com 주소를 사용합니다.
+        const DEFAULT_BG_URL = "https://raw.githubusercontent.com/sae6gnicky/growingphoto/main/bg.jpg";
 
         const App = () => {
-            const [bgImage, setBgImage] = useState(null);
             const [photos, setPhotos] = useState(Array(5).fill(null));
             const [isPreviewOpen, setIsPreviewOpen] = useState(false);
             const [isGenerating, setIsGenerating] = useState(false);
+            const [errorMsg, setErrorMsg] = useState("");
 
             const stages = [
                 "1. 태어났을 때 (50일 전)",
@@ -63,7 +66,7 @@
                 "5. 1학년 (만 6~7세)"
             ];
 
-            // 테이프 스타일 설정: 1~5번째 테이프 모두 세로 방향으로 회전, 크기는 기존의 80% 수준으로 축소
+            // 테이프 스타일 설정: 1~5번째 테이프 모두 세로 방향으로 회전
             const tapes = [
                 { color: 'bg-green-400', cssTransform: 'rotate(-93deg)', w: 'w-16', h: 'h-5', top: '-24px' },
                 { color: 'bg-pink-400', cssTransform: 'rotate(-90deg)', w: 'w-16', h: 'h-5', top: '-24px' },
@@ -73,7 +76,6 @@
             ];
 
             // A4 가로 (1123px * 794px) 기준 위치
-            // 2~5번째 카드는 가로 줄(top: 200px)에 걸리도록 일정한 높이(220px)로 설정
             const positions = [
                 { left: '40px', top: '240px', transform: 'rotate(-3deg)' },
                 { left: '250px', top: '220px', transform: 'rotate(2deg)' },
@@ -82,28 +84,26 @@
                 { left: '900px', top: '220px', transform: 'rotate(-2deg)' }
             ];
 
-            const handleBgUpload = (e) => {
-                const file = e.target.files[0];
-                if (file) setBgImage(URL.createObjectURL(file));
-            };
-
             const handlePhotoUpload = (index, e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const newPhotos = [...photos];
                     newPhotos[index] = URL.createObjectURL(file);
                     setPhotos(newPhotos);
+                    setErrorMsg(""); // 사진 업로드 시 경고 메시지 초기화
                 }
             };
 
             const generatePDF = async () => {
                 setIsGenerating(true);
+                setErrorMsg("");
                 const element = document.getElementById('pdf-content');
                 
                 try {
                     const canvas = await html2canvas(element, {
                         scale: 2, // 고화질 출력
-                        useCORS: true,
+                        useCORS: true, // 외부 GitHub 이미지 렌더링을 위해 필수
+                        allowTaint: false,
                         backgroundColor: '#ffffff'
                     });
                     
@@ -119,11 +119,14 @@
                     pdf.save('나의_성장과정_활동지.pdf');
                 } catch (error) {
                     console.error("PDF 생성 중 오류 발생:", error);
-                    alert("PDF 생성 중 문제가 발생했습니다.");
+                    setErrorMsg("⚠️ PDF 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
                 } finally {
                     setIsGenerating(false);
                 }
             };
+
+            // 사진이 전부 업로드되었는지 확인
+            const missingPhotosCount = photos.filter(p => p === null).length;
 
             return (
                 <div className="min-h-screen p-6 md:p-12">
@@ -136,25 +139,20 @@
 
                         <div className="p-8 space-y-8">
                             
-                            {/* 배경 이미지 업로드 섹션 */}
-                            <div className="bg-orange-50 p-6 rounded-2xl border border-orange-200">
-                                <h2 className="text-xl font-bold mb-3 text-orange-800">📌 1단계: 배경 양식 업로드</h2>
-                                <p className="text-sm text-orange-600 mb-4">제공받으신 <b>'배경.JPG'</b> 파일을 여기에 업로드해주세요.</p>
-                                <input 
-                                    type="file" 
-                                    accept="image/*" 
-                                    onChange={handleBgUpload}
-                                    className="block w-full text-sm text-gray-500"
-                                />
-                            </div>
-
                             {/* 사진 업로드 섹션 */}
                             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
-                                <h2 className="text-xl font-bold mb-2 text-blue-800">📸 2단계: 성장 사진 업로드 (총 5장)</h2>
-                                <ul className="text-sm text-blue-600 mb-5 space-y-1">
-                                    <li>* 얼굴이 선명하게 나온 사진을 업로드해 주세요.</li>
-                                    <li>* 개인정보 보호를 위해 업로드한 이미지는 수집 및 저장되지 않습니다.</li>
-                                </ul>
+                                <h2 className="text-xl font-bold mb-3 text-blue-800">📸 성장 사진 업로드 (총 5장)</h2>
+                                
+                                {/* 빨간색 경고 문구 영역 */}
+                                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl mb-6">
+                                    <p className="text-sm font-bold text-red-600 mb-1">⚠️ 주의사항 (필독)</p>
+                                    <ul className="text-sm text-red-600 font-semibold space-y-1 list-disc list-inside">
+                                        <li>얼굴이 선명하게 나온 세로 비율의 사진을 업로드해 주세요.</li>
+                                        <li>개인정보 보호를 위해 업로드한 이미지는 서버에 수집 및 저장되지 않습니다.</li>
+                                        <li>사진을 저장하지 않기 때문에 새로고침하거나 창을 닫으면 사라집니다. 미리 사진 5장을 준비해두시고 만들기를 시작해주시기 바랍니다.</li>
+                                    </ul>
+                                </div>
+
                                 <div className="space-y-4">
                                     {stages.map((stage, index) => (
                                         <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-blue-100 gap-4">
@@ -163,7 +161,7 @@
                                                     {photos[index] ? (
                                                         <img src={photos[index]} alt={stage} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs text-center">사진 없음</div>
+                                                        <div className="w-full h-full flex items-center justify-center text-red-400 font-bold text-xs text-center">미등록</div>
                                                     )}
                                                 </div>
                                                 <span className="font-bold text-gray-700">{stage}</span>
@@ -177,10 +175,17 @@
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* 미등록 사진이 있을 경우 빨간색 경고 표시 */}
+                                {missingPhotosCount > 0 && (
+                                    <p className="mt-4 text-center text-sm font-bold text-red-600 animate-pulse">
+                                        * 현재 {missingPhotosCount}장의 사진이 아직 업로드되지 않았습니다.
+                                    </p>
+                                )}
                             </div>
 
                             {/* 버튼 섹션 */}
-                            <div className="flex justify-center pt-4">
+                            <div className="flex justify-center pt-2">
                                 <button 
                                     onClick={() => setIsPreviewOpen(true)}
                                     className="bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-4 px-12 rounded-full shadow-lg transition-transform transform hover:-translate-y-1"
@@ -195,7 +200,14 @@
                     {isPreviewOpen && (
                         <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex flex-col">
                             <div className="p-4 flex justify-between items-center bg-gray-900 text-white">
-                                <h3 className="text-xl font-bold">📄 활동지 미리보기</h3>
+                                <div className="flex items-center space-x-4">
+                                    <h3 className="text-xl font-bold">📄 활동지 미리보기</h3>
+                                    {errorMsg && (
+                                        <span className="text-sm text-red-400 font-bold bg-red-900 bg-opacity-50 px-3 py-1 rounded">
+                                            {errorMsg}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="space-x-4">
                                     <button 
                                         onClick={() => setIsPreviewOpen(false)}
@@ -221,12 +233,13 @@
                                     className="relative bg-white shadow-2xl flex-shrink-0 origin-center"
                                     style={{ width: '1123px', height: '794px' }}
                                 >
-                                    {/* 배경 이미지 */}
-                                    {bgImage ? (
-                                        <img src={bgImage} className="absolute inset-0 w-full h-full object-cover" alt="배경" />
-                                    ) : (
-                                        <div className="absolute inset-0 bg-white"></div>
-                                    )}
+                                    {/* 고정된 GitHub 배경 이미지 (CORS 속성 포함) */}
+                                    <img 
+                                        src={DEFAULT_BG_URL} 
+                                        crossOrigin="anonymous" 
+                                        className="absolute inset-0 w-full h-full object-cover" 
+                                        alt="배경" 
+                                    />
 
                                     {/* 사진을 거는 가로 줄 */}
                                     <div className="absolute left-0 w-full h-1 bg-slate-400 shadow-sm z-0" style={{ top: '200px' }}></div>
@@ -262,9 +275,9 @@
                                                 {photo ? (
                                                     <img src={photo} alt={`성장사진 ${i+1}`} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-gray-200 flex flex-col items-center justify-center text-gray-400 border border-gray-300">
+                                                    <div className="w-full h-full bg-gray-200 flex flex-col items-center justify-center text-red-400 border border-gray-300">
                                                         <span className="text-3xl mb-2">📷</span>
-                                                        <span className="text-sm">사진 {i+1}</span>
+                                                        <span className="text-sm font-bold">사진 {i+1} 미등록</span>
                                                     </div>
                                                 )}
                                             </div>
